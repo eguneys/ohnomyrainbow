@@ -58,15 +58,18 @@ class Slot {
 class Card {
     hovering = false
     dragging = false
-    shifting = 0
-    settling = 0
+    shifting: Spring
 
+    get a_x_i() {
+        return this.shifting.position
+    }
 
     a_box = () => ({ x: this.a_x_i, y: 40, w: 48 * 4, h: 48 * 4 })
 
     empty_slot = -1
 
-    constructor(public target_slot: number, public a_x_i: number) {
+    constructor(public target_slot: number, public x: number) {
+        this.shifting = new Spring(x, x, 800, 20)
     }
 
 
@@ -78,27 +81,12 @@ class Card {
             card.hovering = false
         }
 
-        if (mouse.is_just_down) {
-            if (card.hovering) {
-                card.dragging = true
-            }
-        }
-
-
-        if (mouse.is_just_up) {
-            if (card.dragging) {
-                card.dragging = false
-                card.settling = 100
-            }
-        }
-
-
-
 
         if (card.dragging) {
             let from = card.a_x_i
             let to = cursor_x - card.a_box().w / 2
-            card.a_x_i = lerp(to, from, 0.3)
+            card.shifting.position = lerp(to, from, 0.3)
+            card.shifting.target = card.shifting.position
         }
 
         if (card.dragging) {
@@ -115,26 +103,13 @@ class Card {
             if (card.target_slot === card2.target_slot) {
                 card2.empty_slot = card2.target_slot
                 card2.target_slot = card.empty_slot
-                card2.shifting = 200
+
+                let to = slots[card2.target_slot].a_x
+                card2.shifting.target = to
             }
         }
 
-        if (card.shifting > 0) {
-            card.shifting = Math.max(0, card.shifting - dt)
-            let from = slots[card.empty_slot].a_x
-            let to = slots[card.target_slot].a_x
-
-            card.a_x_i = lerp(to, from, card.shifting / 200)
-        }
-
-
-        if (card.settling > 0) {
-            card.settling = Math.max(0, card.settling - dt)
-            let from = card.a_x_i
-            let to = slots[card.target_slot].a_x
-
-            card.a_x_i = lerp(to, from, card.shifting / 100)
-        }
+        card.shifting.update(dt / 1000)
     }
 }
 
@@ -180,6 +155,29 @@ export function _update(dt: number) {
     } else {
         button.hovering = false
     }
+
+
+    if (mouse.is_just_down) {
+        for (let card of cards)
+            if (card.hovering) {
+                card.dragging = true
+                break
+            }
+    }
+
+
+    if (mouse.is_just_up) {
+        for (let card of cards)
+            if (card.dragging) {
+                card.dragging = false
+
+                let to = slots[card.target_slot].a_x
+                card.shifting.target = to
+            }
+    }
+
+
+
 
     button.update(dt)
 
@@ -240,7 +238,7 @@ export function _render() {
 
     x = 0
     y = 0
-    draw_spr(0, 0, 40, 40, x, y, 4, 4)
+    //draw_spr(0, 0, 40, 40, x, y, 4, 4)
 
 
     x = 260
