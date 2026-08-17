@@ -261,7 +261,6 @@ export function _update(dt: number) {
 
     button.update(dt)
 
-    mouse.update()
 
     if (mouse.is_just_down) {
         first_key_pressed = true
@@ -271,6 +270,8 @@ export function _update(dt: number) {
         first_audio_initialized = true
         audio.playAudio('main', true)
     }
+
+    mouse.update()
 }
 
 let colors = [0, 1, 2, 3, 4, 5, 6]
