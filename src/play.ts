@@ -3,6 +3,54 @@ import { box_intersects, type Box } from "./collision"
 import { Mouse } from "./mouse"
 import { song_hello } from "./songs"
 
+class Spring {
+    position: number;
+    velocity = 0;
+    target: number;
+    stiffness: number;
+    damping: number;
+
+    constructor(position: number, target = position, stiffness = 170, damping = 26) {
+        this.position = position;
+        this.target = target;
+        this.stiffness = stiffness;
+        this.damping = damping;
+    }
+
+    update(dt: number) {
+        const force = (this.target - this.position) * this.stiffness - this.velocity * this.damping;
+        this.velocity += force * dt;
+        this.position += this.velocity * dt;
+    }
+}
+
+class Button {
+    box = { x: 274, y: 250, w: 160, h: 100 }
+
+    hovering = false
+    hovering_spring = new Spring(0, 0, 200, 8)
+
+    next_bounce = 0
+
+
+    update(dt: number) {
+
+        if (this.hovering) {
+            this.next_bounce -= dt
+            if (this.next_bounce <= 0) {
+                this.hovering_spring.velocity += 40 // kick it
+                this.next_bounce = 600 + Math.random() * 120 // random gap till next bounce
+            }
+        }
+
+        this.hovering_spring.update(dt / 1000)
+
+    }
+}
+
+let button = new Button()
+
+
 class Slot {
     constructor(readonly a_x: number) { }
 }
@@ -110,14 +158,11 @@ export function _init() {
 }
 
 let t = 0
-let asin = 0
 let first_update_called = false
 let first_key_pressed = false
 let first_audio_initialized = false
 export function _update(dt: number) {
     t += dt;
-
-    asin = Math.sin(t * 0.001)
 
     first_update_called = true
 
@@ -129,6 +174,14 @@ export function _update(dt: number) {
     }
 
     cards.sort((a, b) => a.dragging ? 1 : b.dragging ? -1 : 0)
+
+    if (box_intersects(button.box, cursor_box())) {
+        button.hovering = true
+    } else {
+        button.hovering = false
+    }
+
+    button.update(dt)
 
     mouse.update()
 
@@ -192,7 +245,10 @@ export function _render() {
 
     x = 260
     y = 236
+    cx.save()
+    cx.rotate(button.hovering_spring.position * -0.01)
     draw_spr(0, 80, 48, 32, x, y, 4, 4)
+    cx.restore()
 
 
     x = cursor_x - 16
@@ -201,9 +257,7 @@ export function _render() {
 
     if (import.meta.env.DEV) {
         //render_box(cursor_box())
-        //render_box(a_box())
-        //render_box(b_box())
-        //render_box(c_box())
+        //render_box(button.box)
     }
 }
 
@@ -244,6 +298,7 @@ export function _set_canvas(canvas: HTMLCanvasElement) {
     mouse = Mouse.bindTo(canvas)
 }
 
+// @ts-ignore
 function render_box(box: Box, color = 'white') {
     cx.lineWidth = 1
     cx.strokeStyle = color

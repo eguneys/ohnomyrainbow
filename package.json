@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "maps": "cd design && node copy_maps.ts",
-    "zip": "roadroller --optimize 2 dist/assets/index.min.js -o dist/assets/index.min.js && cd dist && 7z a ../dist.zip -mx9 && cd ../bin && optipng.exe -o7 ../dist/sprites.png ../dist/background.png ../dist/tiles.png && advzip.exe --recompress --shrink-extra ../dist.zip",
+    "zip": "roadroller --optimize 2 dist/assets/index.min.js -o dist/assets/index.min.js && cd dist && 7z a ../dist.zip -mx9 && cd ../bin && optipng.exe -o7 ../dist/sprites.png && advzip.exe --recompress --shrink-extra ../dist.zip",
     "clean": "rimraf dist && rimraf dist.zip",
     "ship": "pnpm clean && pnpm build && pnpm zip"
   },
