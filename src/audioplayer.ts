@@ -31,8 +31,13 @@ export class AudioPlayer {
         source.loop = loop;
         gainNode.gain.value = 0.8;
         source.start();
-        return () => {
-            source.stop()
+        return {
+            stop: () => {
+                source.stop()
+            },
+            setVolume: (t: number) => {
+                gainNode.gain.linearRampToValueAtTime(t, this.cx.currentTime + 0.6)
+            }
         }
     };
 }

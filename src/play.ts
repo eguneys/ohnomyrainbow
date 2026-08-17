@@ -14,8 +14,9 @@ function update_walk(dt: number) {
     }
 
     if (walk_c === walk_c_target) {
-        if (walk_flash_c === 0 && walk_c === 10) {
-            walk_flash_c = 600
+        if (walk_flash_c === 0 && walk_c === 40) {
+            walk_flash_c = 1000
+            audio.playAudio('flash')
         }
     }
 
@@ -38,7 +39,7 @@ function shuffle_cards() {
     cards[2].set_color(colors[2])
     arr_shuffle(colors)
 
-    walk_c_target = 10
+    walk_c_target = 40
 }
 
 class Spring {
@@ -72,12 +73,19 @@ class Button {
 
     flicker_spring = new Spring(0, 0, 600, 8)
 
+    shaking = 0
+
     get alpha() {
         return this.flicker_spring.position < 0.01
     }
 
     click() {
         this.flicker_spring.velocity += 60
+    }
+
+    shake() {
+        this.shaking = 600
+        audio.playAudio('jump')
     }
 
     update(dt: number) {
@@ -88,6 +96,10 @@ class Button {
                 this.hovering_spring.velocity += 40 // kick it
                 this.next_bounce = 600 + Math.random() * 120 // random gap till next bounce
             }
+        }
+
+        if (this.shaking > 0) {
+            this.shaking = Math.max(0, this.shaking - dt)
         }
 
         this.hovering_spring.update(dt / 1000)
@@ -165,6 +177,7 @@ class Card {
 
                 let to = slots[card2.target_slot].a_x
                 card2.shifting.target = to
+                audio.playAudio('slide')
             }
         }
 
@@ -225,11 +238,16 @@ export function _update(dt: number) {
             button.hovering = false
         }
 
+        let has_sorted_true = true
         if (mouse.is_just_down) {
             if (button.hovering) {
-                button.click()
-                //arr_shuffle(colors)
-                shuffle_cards()
+                if (has_sorted_true) {
+                    button.click()
+                    shuffle_cards()
+                    audio.playAudio('shuffle')
+                } else {
+                    button.shake()
+                }
             }
         }
 
@@ -238,6 +256,7 @@ export function _update(dt: number) {
             for (let card of cards)
                 if (card.hovering) {
                     card.dragging = true
+                    audio.playAudio('begin_drag')
                     break
                 }
         }
@@ -248,6 +267,7 @@ export function _update(dt: number) {
         for (let card of cards)
             if (card.dragging) {
                 card.dragging = false
+                audio.playAudio('end_drag')
 
                 let to = slots[card.target_slot].a_x
                 card.shifting.target = to
@@ -272,6 +292,7 @@ export function _update(dt: number) {
     }
 
     mouse.update()
+    audio.update(dt)
 }
 
 let colors = [0, 1, 2, 3, 4, 5, 6]
@@ -341,9 +362,15 @@ export function _render() {
     x = 260
     y = 236
     cx.save()
-    cx.rotate(button.hovering_spring.position * -0.01)
+    if (button.shaking === 0) {
+        cx.rotate(button.hovering_spring.position * -0.01)
+    }
     if (!button.alpha) {
         cx.globalAlpha = 0.1345
+    }
+    if (button.shaking) {
+        let t = button.shaking / 300
+        x += Math.sin(t * 9) * 10
     }
     draw_spr(0, 80, 48, 32, x, y, 4, 4)
     cx.restore()
@@ -355,14 +382,14 @@ export function _render() {
 
     let c = walk_c
     for (let k = 0; k < 8; k++) {
-        if (k > c) break
+        if (k > c / 4) break
         let j = Math.floor(k / 2)
         let i = k % 2
         cx.save()
         cx.translate(j * 200 + i * 130, 60 + i * 130 + Math.sin(j * 0.01) * 30)
         cx.rotate(-Math.PI * 0.5)
         cx.translate(-60, -60)
-        if (walk_flash_c % 200 > 80) {
+        if (walk_flash_c % 400 > 200) {
             cx.globalAlpha = 0.3
         }
         draw_spr(0, 0, 40, 40, 0, 0, 3, 3)
@@ -376,7 +403,7 @@ export function _render() {
 }
 
 function draw_spr(sx: number, sy: number, sw: number, sh: number, x: number, y: number, scale_x: number, scale_y: number) {
-    cx.drawImage(spr_png, sx, sy, sw, sh, x, y, sw * scale_x, sh * scale_y)
+    cx.drawImage(spr_png, sx, sy, sw, sh, x, y, Math.floor(sw * scale_x), Math.floor(sh * scale_y))
 }
 
 let spr_png!: HTMLImageElement
@@ -419,23 +446,78 @@ function render_box(box: Box, color = 'white') {
     cx.strokeRect(box.x, box.y, box.w, box.h)
 }
 
+type AudioPlayback = { stop: () => void, setVolume: (_: number) => void }
+
 class AudioPlayerManager {
     static loadAudio = async () => {
         let res = new AudioPlayerManager()
 
         res.audio.set('main', await AudioPlayer.init(song_hello))
-        res.audio.set('jump', await AudioPlayer.init(song_hello.slice(10, 13), 300))
+        res.audio.set('jump', await AudioPlayer.init(song_hello.slice(23, 35), 333))
+        res.audio.set('end_drag', await AudioPlayer.init(song_hello.slice(6, 9), 133))
+        res.audio.set('begin_drag', await AudioPlayer.init(song_hello.slice(17, 20), 133))
+        res.audio.set('slide', await AudioPlayer.init(song_hello.slice(37, 40), 320))
 
+        res.audio.set('flash', await AudioPlayer.init(song_hello.slice(8, 13).repeat(2).concat(song_hello.slice(5, 8).repeat(3)).concat(song_hello.slice(0, 5).repeat(2)), 301))
+        res.audio.set('shuffle', await AudioPlayer.init(song_hello.slice(8, 13).repeat(7), 331))
         return res
     }
 
     audio: Map<string, AudioPlayer> = new Map()
 
-    playAudio(name: string, loop: boolean = false) {
-        this.audio.get(name)!.play(loop)
-    }
-}
+    looping: Map<string, AudioPlayback> = new Map()
 
+    playAudio(name: string, loop: boolean = false) {
+        let pl = this.audio.get(name)!.play(loop)
+        if (loop) {
+            this.looping.set(name, pl)
+        } else {
+            pl.setVolume(0.5)
+        }
+
+        if (!loop) {
+            this.quiet_cool = 200
+        }
+    }
+
+    set_looping_quiet_down() {
+        for (let pl of this.looping.values()) {
+            pl.setVolume(0.3)
+        }
+    }
+
+    set_looping_quiet_up() {
+        for (let pl of this.looping.values()) {
+            pl.setVolume(0.8)
+        }
+    }
+
+    is_quiet = false
+    quiet_cool = 0
+    change_cool = 0
+    update(dt: number) {
+
+        if (this.quiet_cool > 0 && !this.is_quiet) {
+            if (this.change_cool === 0) {
+                this.is_quiet = true
+                this.set_looping_quiet_down()
+                this.change_cool = 300
+            }
+        }
+
+        if (this.quiet_cool === 0 && this.is_quiet) {
+            if (this.change_cool === 0) {
+                this.is_quiet = false
+                this.set_looping_quiet_up()
+                this.change_cool = 300
+            }
+        }
+
+        this.quiet_cool = Math.max(0, this.quiet_cool - dt)
+        this.change_cool = Math.max(0, this.change_cool - dt)
+    }
+
+}
 
 export function arr_shuffle<A>(array: Array<A>) {
     let currentIndex = array.length;
