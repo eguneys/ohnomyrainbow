@@ -3,6 +3,44 @@ import { box_intersects, type Box } from "./collision"
 import { Mouse } from "./mouse"
 import { song_hello } from "./songs"
 
+let enable_interaction = true
+
+let walk_c = -1
+let walk_c_target = -1
+let walk_flash_c = 0
+function update_walk(dt: number) {
+    if (walk_c < walk_c_target) {
+        walk_c = Math.min(walk_c_target, walk_c + 20 * dt / 1000)
+    }
+
+    if (walk_c === walk_c_target) {
+        if (walk_flash_c === 0 && walk_c === 10) {
+            walk_flash_c = 600
+        }
+    }
+
+    if (walk_flash_c > 0) {
+        walk_flash_c = Math.max(0, walk_flash_c - dt)
+        if (walk_flash_c === 0) {
+            walk_c = -1
+            walk_c_target = -1
+            enable_interaction = true
+        }
+    }
+}
+
+
+function shuffle_cards() {
+    enable_interaction = false
+    arr_shuffle(colors)
+    cards[0].set_color(colors[0])
+    cards[1].set_color(colors[1])
+    cards[2].set_color(colors[2])
+    arr_shuffle(colors)
+
+    walk_c_target = 10
+}
+
 class Spring {
     position: number;
     velocity = 0;
@@ -32,6 +70,15 @@ class Button {
 
     next_bounce = 0
 
+    flicker_spring = new Spring(0, 0, 600, 8)
+
+    get alpha() {
+        return this.flicker_spring.position < 0.01
+    }
+
+    click() {
+        this.flicker_spring.velocity += 60
+    }
 
     update(dt: number) {
 
@@ -44,6 +91,8 @@ class Button {
         }
 
         this.hovering_spring.update(dt / 1000)
+        this.flicker_spring.update(dt / 1000)
+
 
     }
 }
@@ -59,9 +108,18 @@ class Card {
     hovering = false
     dragging = false
     shifting: Spring
+    color: Spring
+
+    get a_c() {
+        return this.color.position
+    }
 
     get a_x_i() {
         return this.shifting.position
+    }
+
+    set_color(color: number) {
+        this.color.target = color
     }
 
     a_box = () => ({ x: this.a_x_i, y: 40, w: 48 * 4, h: 48 * 4 })
@@ -70,6 +128,7 @@ class Card {
 
     constructor(public target_slot: number, public x: number) {
         this.shifting = new Spring(x, x, 800, 20)
+        this.color = new Spring(0, 0)
     }
 
 
@@ -109,7 +168,15 @@ class Card {
             }
         }
 
+        let epsilon = 0.1
+        if (Math.abs(card.color.position - card.color.target) < epsilon) {
+            card.color.position = card.color.target
+            card.color.velocity = 0
+        }
+
         card.shifting.update(dt / 1000)
+
+        card.color.update(dt / 1000)
     }
 }
 
@@ -150,19 +217,30 @@ export function _update(dt: number) {
 
     cards.sort((a, b) => a.dragging ? 1 : b.dragging ? -1 : 0)
 
-    if (box_intersects(button.box, cursor_box())) {
-        button.hovering = true
-    } else {
-        button.hovering = false
-    }
+    if (enable_interaction) {
 
+        if (box_intersects(button.box, cursor_box())) {
+            button.hovering = true
+        } else {
+            button.hovering = false
+        }
 
-    if (mouse.is_just_down) {
-        for (let card of cards)
-            if (card.hovering) {
-                card.dragging = true
-                break
+        if (mouse.is_just_down) {
+            if (button.hovering) {
+                button.click()
+                //arr_shuffle(colors)
+                shuffle_cards()
             }
+        }
+
+
+        if (mouse.is_just_down) {
+            for (let card of cards)
+                if (card.hovering) {
+                    card.dragging = true
+                    break
+                }
+        }
     }
 
 
@@ -179,6 +257,8 @@ export function _update(dt: number) {
 
 
 
+    update_walk(dt)
+
     button.update(dt)
 
     mouse.update()
@@ -193,7 +273,7 @@ export function _update(dt: number) {
     }
 }
 
-let colors = [0, 1, 2, 3, 4, 5, 6, 7]
+let colors = [0, 1, 2, 3, 4, 5, 6]
 
 export function _render() {
     if (!first_update_called) return
@@ -217,7 +297,7 @@ export function _render() {
             let sy = Math.floor(c / 2)
             let sx = c % 2
             cx.save()
-            cx.translate(x, y + c * 50)
+            cx.translate(x, y + ic * 50)
             cx.rotate(angle)
             draw_spr(56 + sx * 8, sy * 8, 8, 8, 0, 0, 7, 7)
             cx.restore()
@@ -234,6 +314,22 @@ export function _render() {
         y = 40
         x = card.a_x_i
         draw_spr(0, 112, 48, 48, x, y, 4, 4)
+
+
+        let c = card.a_c
+        let sy = Math.floor(c / 2)
+        let sx = c % 2
+        cx.save()
+        cx.translate(x + 50, y + 50)
+
+        for (let r = 0; r < 4; r++) {
+            cx.translate(8 * 12 / 2, 8 * 12 / 2)
+            cx.rotate(Math.PI * 0.25 * r / 4)
+            cx.translate(-8 * 12 / 2, -8 * 12 / 2)
+            draw_spr(56 + sx * 8, sy * 8, 8, 8, 0, 0, 12, 12)
+        }
+
+        cx.restore()
     }
 
     x = 0
@@ -245,6 +341,9 @@ export function _render() {
     y = 236
     cx.save()
     cx.rotate(button.hovering_spring.position * -0.01)
+    if (!button.alpha) {
+        cx.globalAlpha = 0.1345
+    }
     draw_spr(0, 80, 48, 32, x, y, 4, 4)
     cx.restore()
 
@@ -252,6 +351,22 @@ export function _render() {
     x = cursor_x - 16
     y = cursor_y - 16
     draw_spr(40, 0, 16, 16, x, y, 2, 2)
+
+    let c = walk_c
+    for (let k = 0; k < 8; k++) {
+        if (k > c) break
+        let j = Math.floor(k / 2)
+        let i = k % 2
+        cx.save()
+        cx.translate(j * 200 + i * 130, 60 + i * 130 + Math.sin(j * 0.01) * 30)
+        cx.rotate(-Math.PI * 0.5)
+        cx.translate(-60, -60)
+        if (walk_flash_c % 200 > 80) {
+            cx.globalAlpha = 0.3
+        }
+        draw_spr(0, 0, 40, 40, 0, 0, 3, 3)
+        cx.restore()
+    }
 
     if (import.meta.env.DEV) {
         //render_box(cursor_box())
@@ -319,3 +434,22 @@ class AudioPlayerManager {
         this.audio.get(name)!.play(loop)
     }
 }
+
+
+export function arr_shuffle<A>(array: Array<A>) {
+    let currentIndex = array.length;
+
+    // While there remain elements to shuffle...
+    while (currentIndex != 0) {
+
+        // Pick a remaining element...
+        let randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+
+        // And swap it with the current element.
+        [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex], array[currentIndex]];
+    }
+    return array
+}
+
