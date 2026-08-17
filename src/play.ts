@@ -48,7 +48,6 @@ class Card {
 
 
         if (card.dragging) {
-
             let from = card.a_x_i
             let to = cursor_x - card.a_box().w / 2
             card.a_x_i = lerp(to, from, 0.3)
@@ -143,6 +142,8 @@ export function _update(dt: number) {
     }
 }
 
+let colors = [0, 1, 2, 3, 4, 5, 6, 7]
+
 export function _render() {
     if (!first_update_called) return
 
@@ -152,6 +153,27 @@ export function _render() {
 
     cx.fillStyle = 'black'
     cx.fillRect(0, 0, 640, 360)
+
+
+    for (let ic = 0; ic < 7; ic++) {
+        let c = colors[ic]
+        for (let i = 0; i < 80; i++) {
+            const angle = Math.PI * 0.1 + (i / 80) * Math.PI * 2
+            const rx = 300, ry = 280          // even horizontal/vertical radius
+            const x = 320 + Math.cos(angle) * rx
+            const y = 300 + Math.sin(angle) * ry
+
+            let sy = Math.floor(c / 2)
+            let sx = c % 2
+            cx.save()
+            cx.translate(x, y + c * 50)
+            cx.rotate(angle)
+            draw_spr(56 + sx * 8, sy * 8, 8, 8, 0, 0, 7, 7)
+            cx.restore()
+        }
+    }
+
+
 
 
     let x = 0, y = 0
@@ -167,12 +189,15 @@ export function _render() {
     y = 0
     draw_spr(0, 0, 40, 40, x, y, 4, 4)
 
+
+    x = 260
+    y = 236
+    draw_spr(0, 80, 48, 32, x, y, 4, 4)
+
+
     x = cursor_x - 16
     y = cursor_y - 16
     draw_spr(40, 0, 16, 16, x, y, 2, 2)
-
-
-
 
     if (import.meta.env.DEV) {
         //render_box(cursor_box())
