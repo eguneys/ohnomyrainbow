@@ -225,7 +225,7 @@ class AppleCollect {
 
     collect_spring = new Spring(0, 0, 1700, 70)
 
-    flash_countdown = 2000
+    flash_countdown = 800
     flash_timer = 0
 
     constructor(readonly x: number) { }
@@ -236,7 +236,7 @@ class AppleCollect {
 
     get flash_alpha() {
         if (this.flash_timer > 0) {
-            return this.flash_timer % 260 > 100
+            return this.flash_timer % 400 > 200
         }
         return false
     }
@@ -308,6 +308,7 @@ let cursor_x = 0
 let cursor_y = 0
 let cursor_box = () => ({ x: cursor_x - 16, y: cursor_y - 16, w: 32, h: 32 })
 let audio: AudioPlayerManager
+
 
 export function _init() {
 }
@@ -559,7 +560,10 @@ export function _render() {
 }
 
 function draw_spr(sx: number, sy: number, sw: number, sh: number, x: number, y: number, scale_x: number, scale_y: number) {
-    cx.drawImage(spr_png, sx, sy, sw, sh, x, y, Math.floor(sw * scale_x), Math.floor(sh * scale_y))
+
+    const inset = 0.5;
+    cx.drawImage(spr_png, sx + inset, sy + inset, sw - inset * 2, sh - inset * 2, x, y, sw * scale_x, sh * scale_y);
+    //cx.drawImage(spr_png, sx, sy, sw, sh, x, y, Math.floor(sw * scale_x), Math.floor(sh * scale_y))
 }
 
 let spr_png!: HTMLImageElement
@@ -691,4 +695,3 @@ export function arr_shuffle<A>(array: Array<A>) {
     }
     return array
 }
-
