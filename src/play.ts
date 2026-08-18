@@ -219,6 +219,89 @@ class Card {
     }
 }
 
+class PooPickup {
+
+    constructor(readonly x: number, readonly y: number) { }
+    get box() {
+        return { x: this.x, y: this.y, w: 96, h: 96 }
+    }
+
+    picked_up = false
+
+    get anim_frame() {
+        return Math.min(3, Math.floor(this.frame))
+    }
+
+    frame = 0
+
+    broom_cool = 0
+
+    broom_clean() {
+        if (this.broom_cool === 0) {
+            this.frame = this.frame + 1
+
+            this.broom_cool = 400
+        }
+
+        if (this.frame === 3) {
+            this.picked_up = true
+        }
+    }
+
+    update(dt: number) {
+        this.broom_cool = Math.max(0, this.broom_cool - dt)
+    }
+}
+
+class Broom {
+
+    frame = 0
+
+    broom_cool = 0
+
+    flick_spring = new Spring(0, 0, 800, 18)
+
+    broom() {
+        if (this.broom_cool === 0) {
+            this.frame = (this.frame + 1) % 2
+            this.broom_cool = 400
+
+            if (this.frame === 0) {
+                this.flick_spring.target = -10
+            } else {
+                this.flick_spring.target = 10
+            }
+        }
+    }
+
+    get x() {
+        return this.flick_spring.position
+    }
+
+
+    update(dt: number) {
+        this.broom_cool = Math.max(0, this.broom_cool - dt)
+
+        this.flick_spring.update(dt / 1000)
+    }
+}
+
+let thanks_time = false
+let thanks_cool = 600
+
+let broom_time = true
+let broom = new Broom()
+let poo_pickups = [
+    new PooPickup(30, 50),
+    new PooPickup(30 + 130, 50),
+    new PooPickup(30 + 260, 50),
+    new PooPickup(30 + 260 + 160, 50),
+    new PooPickup(30, 50 + 120),
+    new PooPickup(30 + 130, 30 + 120),
+    new PooPickup(30 + 260, 40 + 120),
+    new PooPickup(30 + 260 + 190, 60 + 120),
+]
+
 class AppleCollect {
 
     collected = false
@@ -307,6 +390,7 @@ let cards = [new Card(0, a_x), new Card(1, b_x), new Card(2, c_x)]
 let cursor_x = 0
 let cursor_y = 0
 let cursor_box = () => ({ x: cursor_x - 16, y: cursor_y - 16, w: 32, h: 32 })
+let cursor_box_large = () => ({ x: cursor_x - 16, y: cursor_y - 16, w: 64, h: 64 })
 let audio: AudioPlayerManager
 
 
@@ -347,6 +431,35 @@ export function _update(dt: number) {
             } else if (
                 colors.filter(_ => cards.find(c => c.a_c === _)).join('') !== sorted_cards.map(_ => _.a_c).join('')) {
                 has_sorted_true = false
+            }
+        }
+
+        if (broom_time) {
+            for (let poo of poo_pickups) {
+                if (box_intersects(poo.box, cursor_box_large())) {
+                    broom.broom()
+                    poo.broom_clean()
+                }
+            }
+        }
+
+        for (let poo of poo_pickups) {
+            poo.update(dt)
+        }
+        broom.update(dt)
+
+        if (thanks_time) {
+            thanks_cool = thanks_cool - dt
+            if (thanks_cool < 0) {
+                update_thanks_time(dt)
+            }
+        }
+
+        if (broom_time) {
+            let all_clean = poo_pickups.every(_ => _.picked_up)
+            if (all_clean) {
+                thanks_time = true
+                broom_time = false
             }
         }
 
@@ -425,6 +538,11 @@ export function _render() {
     cx.fillStyle = 'black'
     cx.fillRect(0, 0, 640, 360)
 
+    if (thanks_time && thanks_cool < 0) {
+        render_thanks_time()
+        return
+    }
+
 
     for (let ic = 0; ic < 7; ic++) {
         let c = colors[ic]
@@ -445,39 +563,48 @@ export function _render() {
     }
 
 
-
-
     let x = 0, y = 0
 
 
-    for (let card of cards) {
-        y = 40
-        x = card.a_x_i
-
-        let shake_t = kick_camera_spring.position
-        cx.save()
-        cx.translate(x, y)
-        cx.translate(96, 96)
-        cx.rotate(shake_t * 0.1 * (card.a_c < 3.5 ? -1 : 1))
-        cx.translate(0, shake_t * -10)
-        cx.translate(-96, -96)
-        draw_spr(0, 112, 48, 48, 0, 0, 4, 4)
-        cx.restore()
-
-        let c = card.a_c
-        let sy = Math.floor(c / 2)
-        let sx = c % 2
-        cx.save()
-        cx.translate(x + 50, y + 50)
-
-        for (let r = 0; r < 4; r++) {
-            cx.translate(8 * 12 / 2, 8 * 12 / 2)
-            cx.rotate(shake_t * Math.PI * 0.1)
-            cx.rotate(Math.PI * 0.25 * r / 4)
-            cx.translate(-8 * 12 / 2, -8 * 12 / 2)
-            draw_spr(56 + sx * 8, sy * 8, 8, 8, 0, 0, 12, 12)
+    if (broom_time) {
+        for (let poo of poo_pickups) {
+            x = poo.box.x
+            y = poo.box.y
+            draw_spr(72 + 24 * Math.floor(poo.frame), 0, 24, 24, x, y, 4, 4)
         }
-        cx.restore()
+    }
+
+    if (!broom_time) {
+
+        for (let card of cards) {
+            y = 40
+            x = card.a_x_i
+
+            let shake_t = kick_camera_spring.position
+            cx.save()
+            cx.translate(x, y)
+            cx.translate(96, 96)
+            cx.rotate(shake_t * 0.1 * (card.a_c < 3.5 ? -1 : 1))
+            cx.translate(0, shake_t * -10)
+            cx.translate(-96, -96)
+            draw_spr(0, 112, 48, 48, 0, 0, 4, 4)
+            cx.restore()
+
+            let c = card.a_c
+            let sy = Math.floor(c / 2)
+            let sx = c % 2
+            cx.save()
+            cx.translate(x + 50, y + 50)
+
+            for (let r = 0; r < 4; r++) {
+                cx.translate(8 * 12 / 2, 8 * 12 / 2)
+                cx.rotate(shake_t * Math.PI * 0.1)
+                cx.rotate(Math.PI * 0.25 * r / 4)
+                cx.translate(-8 * 12 / 2, -8 * 12 / 2)
+                draw_spr(56 + sx * 8, sy * 8, 8, 8, 0, 0, 12, 12)
+            }
+            cx.restore()
+        }
     }
 
     let collect_y = 0
@@ -535,7 +662,17 @@ export function _render() {
 
     x = cursor_x - 16
     y = cursor_y - 16
-    draw_spr(40, 0, 16, 16, x, y, 2, 2)
+
+    if (broom_time) {
+        x -= 30
+        y -= 90
+        x += broom.x
+        y += Math.sin(broom.x * 0.2) * 3
+        let flip = broom.frame * 32
+        draw_spr(48 + flip, 112, 32, 48, x, y, 3, 3)
+    } else {
+        draw_spr(40, 0, 16, 16, x, y, 2, 2)
+    }
 
     let c = walk_c
     for (let k = 0; k < 8; k++) {
@@ -554,8 +691,11 @@ export function _render() {
     }
 
     if (import.meta.env.DEV) {
-        //render_box(cursor_box())
+        //render_box(cursor_box_large())
         //render_box(button.box())
+        for (let poo of poo_pickups) {
+            //render_box(poo.box)
+        }
     }
 }
 
@@ -694,4 +834,13 @@ export function arr_shuffle<A>(array: Array<A>) {
             array[randomIndex], array[currentIndex]];
     }
     return array
+}
+
+
+function render_thanks_time() {
+
+}
+
+function update_thanks_time(dt: number) {
+
 }
