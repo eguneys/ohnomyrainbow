@@ -3,6 +3,7 @@ import { box_intersects, type Box } from "./collision"
 import { Mouse } from "./mouse"
 import { song_hello } from "./songs"
 
+
 let enable_interaction = true
 
 let walk_c = -1
@@ -11,8 +12,9 @@ let walk_flash_c = 0
 function update_walk(dt: number) {
     if (walk_c < walk_c_target) {
         walk_c = Math.min(walk_c_target, walk_c + 20 * dt / 1000)
-    }
 
+
+    }
     if (walk_c === walk_c_target) {
         if (walk_flash_c === 0 && walk_c === 40) {
             walk_flash_c = 1000
@@ -21,25 +23,40 @@ function update_walk(dt: number) {
     }
 
     if (walk_flash_c > 0) {
+        shuffle_cards_update()
         walk_flash_c = Math.max(0, walk_flash_c - dt)
         if (walk_flash_c === 0) {
             walk_c = -1
             walk_c_target = -1
-            enable_interaction = true
+            shuffle_cards_end()
+        }
+    }
+
+    if (walk_c > -1 && walk_c < 40) {
+        if (walk_c % 2 > 1.8) {
+            kick_camera_spring.velocity += 40
         }
     }
 }
 
 
-function shuffle_cards() {
+function shuffle_cards_begin() {
     enable_interaction = false
+    walk_c_target = 40
+}
+
+function shuffle_cards_update() {
+    if (walk_flash_c % 1 < 0.1)
+        arr_shuffle(colors)
+}
+
+function shuffle_cards_end() {
+    enable_interaction = true
     arr_shuffle(colors)
     cards[0].set_color(colors[0])
     cards[1].set_color(colors[1])
     cards[2].set_color(colors[2])
     arr_shuffle(colors)
-
-    walk_c_target = 40
 }
 
 class Spring {
@@ -63,8 +80,17 @@ class Spring {
     }
 }
 
+function update_collectibles() {
+    for (let apple of apples) {
+        if (!apple.collected && apple.x < (button.box().x + button.box().w / 2)) {
+            apple.collect()
+            break
+        }
+    }
+}
+
 class Button {
-    box = { x: 274, y: 250, w: 160, h: 100 }
+    box = () => ({ x: 20 + level.progress * 52, y: 250, w: 160, h: 100 })
 
     hovering = false
     hovering_spring = new Spring(0, 0, 200, 8)
@@ -193,9 +219,83 @@ class Card {
     }
 }
 
+class AppleCollect {
+
+    collected = false
+
+    collect_spring = new Spring(0, 0, 1700, 70)
+
+    flash_countdown = 2000
+    flash_timer = 0
+
+    constructor(readonly x: number) { }
+
+    get y() {
+        return this.collect_spring.position
+    }
+
+    get flash_alpha() {
+        if (this.flash_timer > 0) {
+            return this.flash_timer % 260 > 100
+        }
+        return false
+    }
+
+    get visible() {
+        if (this.collected && this.flash_timer === 0 && this.flash_countdown === 0) {
+            return false
+        }
+        return true
+    }
+
+    collect() {
+        this.collect_spring.target = -160
+        this.collected = true
+    }
+
+    update(dt: number) {
+        this.collect_spring.update(dt / 1000)
+
+        if (this.collected) {
+            if (this.flash_countdown > 0) {
+                this.flash_countdown = Math.max(0, this.flash_countdown - dt)
+                if (this.flash_countdown === 0) {
+                    this.flash_timer = 1200
+                }
+            }
+
+            if (this.flash_timer > 0) {
+                this.flash_timer = Math.max(0, this.flash_timer - dt)
+            }
+        }
+    }
+}
+
+let apples = [new AppleCollect(200), new AppleCollect(200 + 120), new AppleCollect(200 + 240), new AppleCollect(200 + 360)]
+
+class Level {
+    target_progress = 0
+    progress = 0
+
+    level_up() {
+        this.target_progress += 1
+    }
+
+    update(dt: number) {
+        if (this.progress < this.target_progress) {
+            this.progress = lerp(this.progress, this.target_progress, dt / 1000)
+            this.progress -= Math.sin(t * 0.01) * 0.01
+        }
+    }
+}
+
 function lerp(a: number, b: number, t: number) {
     return a + (b - a) * t
 }
+
+let level = new Level()
+
+let kick_camera_spring = new Spring(0, 0, 1800, 8)
 
 let a_x = 16 + 0
 let b_x = 16 * 2 + 48 * 4
@@ -232,18 +332,30 @@ export function _update(dt: number) {
 
     if (enable_interaction) {
 
-        if (box_intersects(button.box, cursor_box())) {
+        if (box_intersects(button.box(), cursor_box())) {
             button.hovering = true
         } else {
             button.hovering = false
         }
 
         let has_sorted_true = true
+        {
+            let sorted_cards = cards.slice(0).sort((a, b) => a.a_x_i - b.a_x_i)
+            if (new Set(cards.map(_ => _.a_c)).size !== 3) {
+                has_sorted_true = true
+            } else if (
+                colors.filter(_ => cards.find(c => c.a_c === _)).join('') !== sorted_cards.map(_ => _.a_c).join('')) {
+                has_sorted_true = false
+            }
+        }
+
         if (mouse.is_just_down) {
             if (button.hovering) {
+                has_sorted_true = true
                 if (has_sorted_true) {
                     button.click()
-                    shuffle_cards()
+                    level.level_up()
+                    shuffle_cards_begin()
                     audio.playAudio('shuffle')
                 } else {
                     button.shake()
@@ -274,13 +386,18 @@ export function _update(dt: number) {
             }
     }
 
-
+    update_collectibles()
+    for (let apple of apples) {
+        apple.update(dt)
+    }
 
 
     update_walk(dt)
 
     button.update(dt)
 
+    kick_camera_spring.update(dt / 1000)
+    level.update(dt)
 
     if (mouse.is_just_down) {
         first_key_pressed = true
@@ -335,8 +452,16 @@ export function _render() {
     for (let card of cards) {
         y = 40
         x = card.a_x_i
-        draw_spr(0, 112, 48, 48, x, y, 4, 4)
 
+        let shake_t = kick_camera_spring.position
+        cx.save()
+        cx.translate(x, y)
+        cx.translate(96, 96)
+        cx.rotate(shake_t * 0.1 * (card.a_c < 3.5 ? -1 : 1))
+        cx.translate(0, shake_t * -10)
+        cx.translate(-96, -96)
+        draw_spr(0, 112, 48, 48, 0, 0, 4, 4)
+        cx.restore()
 
         let c = card.a_c
         let sy = Math.floor(c / 2)
@@ -346,20 +471,52 @@ export function _render() {
 
         for (let r = 0; r < 4; r++) {
             cx.translate(8 * 12 / 2, 8 * 12 / 2)
+            cx.rotate(shake_t * Math.PI * 0.1)
             cx.rotate(Math.PI * 0.25 * r / 4)
             cx.translate(-8 * 12 / 2, -8 * 12 / 2)
             draw_spr(56 + sx * 8, sy * 8, 8, 8, 0, 0, 12, 12)
         }
-
         cx.restore()
     }
 
-    x = 0
-    y = 0
-    //draw_spr(0, 0, 40, 40, x, y, 4, 4)
+    let collect_y = 0
+    x = apples[0].x
+    y = 250
+    let a = Math.sin(t * 0.01 + x)
+    collect_y = apples[0].y
+    cx.globalAlpha = apples[0].flash_alpha ? 0.3 : 1
+    if (apples[0].visible) {
+        if (collect_y < 0) a *= 0.3
+        draw_spr(40, 40, 40, 40, x, y + a * 12 + 18 + collect_y, 2, 2)
+    }
+    x = apples[1].x
+    a = Math.sin(t * 0.01 + x)
+    collect_y = apples[1].y
+    cx.globalAlpha = apples[1].flash_alpha ? 0.3 : 1
+    if (collect_y < 0) a *= 0.3
+    if (apples[1].visible) {
+        draw_spr(0, 40, 40, 40, x, y + a * 10 + 8 + collect_y, 2.2, 2.3)
+    }
+    x = apples[2].x
+    a = Math.sin(t * 0.01 + x)
+    collect_y = apples[2].y
+    cx.globalAlpha = apples[2].flash_alpha ? 0.3 : 1
+    if (collect_y < 0) a *= 0.3
+    if (apples[2].visible) {
+        draw_spr(0, 40, 40, 40, x, y + a * 8 + 8 + collect_y, 2.3, 2.3)
+    }
+    x = apples[3].x
+    a = Math.sin(t * 0.01 + x)
+    collect_y = apples[3].y
+    cx.globalAlpha = apples[3].flash_alpha ? 0.3 : 1
+    if (collect_y < 0) a *= 0.3
+    if (apples[3].visible) {
+        draw_spr(80, 40, 40, 40, x - 10, y + a * 4 - 4 + collect_y, 2.5, 2.5)
+    }
 
+    cx.globalAlpha = 1
 
-    x = 260
+    x = 0 + button.box().x - 16
     y = 236
     cx.save()
     if (button.shaking === 0) {
@@ -374,7 +531,6 @@ export function _render() {
     }
     draw_spr(0, 80, 48, 32, x, y, 4, 4)
     cx.restore()
-
 
     x = cursor_x - 16
     y = cursor_y - 16
@@ -398,7 +554,7 @@ export function _render() {
 
     if (import.meta.env.DEV) {
         //render_box(cursor_box())
-        //render_box(button.box)
+        //render_box(button.box())
     }
 }
 
