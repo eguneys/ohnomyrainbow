@@ -9,6 +9,8 @@ let enable_interaction = true
 let walk_c = -1
 let walk_c_target = -1
 let walk_flash_c = 0
+
+
 function update_walk(dt: number) {
     if (walk_c < walk_c_target) {
         walk_c = Math.min(walk_c_target, walk_c + 20 * dt / 1000)
@@ -286,7 +288,7 @@ class Broom {
     }
 }
 
-let thanks_time = true
+let thanks_time = false
 let thanks_cool = 600
 
 let broom_time = false
@@ -395,6 +397,56 @@ let audio: AudioPlayerManager
 
 
 export function _init() {
+
+}
+
+function reset_game() {
+
+    audio.stopAudio('main')
+    audio.stopAudio('broom')
+    audio.playAudio('main', true)
+
+    enable_interaction = true
+    walk_c = -1
+    walk_c_target = -1
+    walk_flash_c = 0
+
+    button = new Button()
+
+    thanks_time = false
+    thanks_cool = 600
+
+    broom_time = false
+    broom = new Broom()
+
+    poo_pickups = [
+        new PooPickup(30, 50),
+        new PooPickup(30 + 130, 50),
+        new PooPickup(30 + 260, 50),
+        new PooPickup(30 + 260 + 160, 50),
+        new PooPickup(30, 50 + 120),
+        new PooPickup(30 + 130, 30 + 120),
+        new PooPickup(30 + 260, 40 + 120),
+        new PooPickup(30 + 260 + 190, 60 + 120),
+    ]
+
+    apples = [new AppleCollect(200), new AppleCollect(200 + 120), new AppleCollect(200 + 240), new AppleCollect(200 + 360)]
+
+    level = new Level()
+
+    kick_camera_spring = new Spring(0, 0, 1800, 8)
+
+    slots = [new Slot(a_x), new Slot(b_x), new Slot(c_x)]
+    cards = [new Card(0, a_x), new Card(1, b_x), new Card(2, c_x)]
+
+
+    colors = [0, 1, 2, 3, 4, 5, 6]
+
+    thanks_horse = new ThanksHorse()
+
+
+    thanks_fadeout = new ThanksFadeOut()
+
 }
 
 let t = 0
@@ -758,14 +810,14 @@ class AudioPlayerManager {
         let res = new AudioPlayerManager()
 
         res.audio.set('broom', await AudioPlayer.init(broom_song, 110))
-        res.audio.set('main', await AudioPlayer.init(main_song, 110))
+        res.audio.set('main', await AudioPlayer.init(main_song, 80))
         res.audio.set('jump', await AudioPlayer.init(song_hello.slice(23, 35), 333))
         res.audio.set('end_drag', await AudioPlayer.init(song_hello.slice(6, 7), 330))
         res.audio.set('begin_drag', await AudioPlayer.init(song_hello.slice(17, 18), 330))
         res.audio.set('slide', await AudioPlayer.init(song_hello.slice(37, 40), 320))
 
         res.audio.set('flash', await AudioPlayer.init(song_hello.slice(8, 13).repeat(2).concat(song_hello.slice(5, 8).repeat(3)).concat(song_hello.slice(0, 5).repeat(2)), 301))
-        res.audio.set('shuffle', await AudioPlayer.init(song_hello.slice(8, 13).repeat(7), 331))
+        res.audio.set('shuffle', await AudioPlayer.init(song_hello.slice(8, 13).repeat(3), 331))
         return res
     }
 
@@ -792,7 +844,7 @@ class AudioPlayerManager {
 
     set_looping_quiet_down() {
         for (let pl of this.looping.values()) {
-            pl.setVolume(0.3)
+            pl.setVolume(0.1)
         }
     }
 
@@ -850,6 +902,15 @@ class ThanksHorse {
 
     x = 0
     y = 0
+    kick_spring = new Spring(0, 0, 400, 8)
+
+    get kick_x() {
+        return this.kick_spring.position * 7
+    }
+
+    get kick_r() {
+        return Math.abs(Math.sin(t * 0.005 + this.kick_x * 0.08))
+    }
 
     get anim_frame() {
         return Math.floor(this.frame % 3)
@@ -857,21 +918,145 @@ class ThanksHorse {
     frame = 0
 
     update(dt: number) {
-        this.frame += 0.007 * dt
+        let previous_anim = this.anim_frame
 
+        this.frame += 0.00657465342 * dt
 
+        if (this.anim_frame === 2 && previous_anim === 1) {
+            this.kick_spring.velocity += 30
+        }
+
+        this.kick_spring.update(dt / 1000)
     }
 }
 let thanks_horse = new ThanksHorse()
 
+class ThanksFadeOut {
+
+    get fade_out_alpha() {
+        if (this.fade_out_countdown > 0) {
+            return 4
+        }
+        return (this.fade_out_timer / 3500) * 4
+    }
+
+    fade_out_countdown = 1000
+    fade_out_timer = 0
+
+    black_timer = 0
+
+    update(dt: number) {
+        if (this.fade_out_countdown > 0) {
+            this.fade_out_countdown = Math.max(0, this.fade_out_countdown - dt)
+
+            if (this.fade_out_countdown === 0) {
+                this.fade_out_timer = 3500
+            }
+        }
+
+        if (this.fade_out_timer > 0) {
+            this.fade_out_timer = Math.max(0, this.fade_out_timer - dt)
+
+            if (this.fade_out_timer === 0) {
+                this.black_timer = 1300
+            }
+        }
+
+        if (this.black_timer > 0) {
+            this.black_timer = Math.max(0, this.black_timer - dt)
+
+            if (this.black_timer === 0) {
+                reset_game()
+            }
+        }
+    }
+}
+
+let thanks_fadeout = new ThanksFadeOut()
+
 
 function render_thanks_time() {
+
+    let alpha_c = 0
+
+    alpha_c = Math.max(0, 4 - thanks_fadeout.fade_out_alpha)
+    cx.globalAlpha = alpha_c
+    cx.fillStyle = 'black'
+    cx.fillRect(0, 0, 640, 360)
+    cx.globalAlpha = 1
+
+    cx.save()
+    cx.translate(600, -500)
+    cx.translate(230, 230)
+    cx.rotate(0.125 * Math.PI)
+    cx.translate(-230, -230)
+    draw_spr(64, 24, 8, 8, 0, 0, 230, 230)
+    cx.restore()
+
+
+    alpha_c = Math.max(0, 3 - thanks_fadeout.fade_out_alpha)
+    cx.globalAlpha = alpha_c
+    cx.fillStyle = 'black'
+    cx.fillRect(0, 0, 640, 360)
+    cx.globalAlpha = 1
+
+
+
+    cx.save()
+    cx.rotate(Math.PI * 0.25)
+    draw_rainsheet()
+    cx.restore()
+
+    alpha_c = Math.max(0, 2.5 - thanks_fadeout.fade_out_alpha)
+    cx.globalAlpha = alpha_c
+    cx.fillStyle = 'black'
+    cx.fillRect(0, 0, 640, 360)
+    cx.globalAlpha = 1
+
+
+
+
+    cx.save()
+    cx.rotate(-Math.PI * 0.25)
+    draw_rainsheet()
+    cx.restore()
+
+
+    alpha_c = Math.max(0, 2 - thanks_fadeout.fade_out_alpha)
+    cx.globalAlpha = alpha_c
+    cx.fillStyle = 'black'
+    cx.fillRect(0, 0, 640, 360)
+    cx.globalAlpha = 1
+
     let x = 120
     let y = 120
-    draw_spr(0 + thanks_horse.anim_frame * 48, 80, 48, 32, x, y, 6, 6)
+    cx.save()
+    cx.translate(x, y)
+    cx.rotate(-0.134 - thanks_horse.kick_r * 0.02)
+    cx.translate(thanks_horse.kick_x, 0)
+    draw_spr(0 + thanks_horse.anim_frame * 48, 80, 48, 32, 0, 0, 6, 6)
+    cx.restore()
+
+    alpha_c = Math.max(0, 1 - thanks_fadeout.fade_out_alpha)
+    cx.globalAlpha = alpha_c
+    cx.fillStyle = 'black'
+    cx.fillRect(0, 0, 640, 360)
+    cx.globalAlpha = 1
+}
+
+function draw_rainsheet() {
+    for (let k = 0; k < 20; k++)
+        for (let i = 0; i < 7; i++) {
+            let x = k * 7 * 7
+            let y = i * 7 * 7
+            let c = i
+            let sy = Math.floor(c / 2)
+            let sx = c % 2
+            draw_spr(56 + sx * 8, sy * 8, 8, 8, x, y, 7, 7)
+        }
 }
 
 function update_thanks_time(dt: number) {
     thanks_horse.update(dt)
-
+    thanks_fadeout.update(dt)
 }
