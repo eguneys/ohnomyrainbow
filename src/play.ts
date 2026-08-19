@@ -240,7 +240,7 @@ class PooPickup {
         if (this.broom_cool === 0) {
             this.frame = this.frame + 1
 
-            this.broom_cool = 400
+            this.broom_cool = 773 + Math.random() * 120
         }
 
         if (this.frame === 3) {
@@ -286,7 +286,7 @@ class Broom {
     }
 }
 
-let thanks_time = false
+let thanks_time = true
 let thanks_cool = 600
 
 let broom_time = false
@@ -662,7 +662,7 @@ export function _render() {
         let t = button.shaking / 300
         x += Math.sin(t * 9) * 10
     }
-    draw_spr(0, 80, 48, 32, x, y, 4, 4)
+    draw_spr(112, 128, 48, 32, x, y, 4, 4)
     cx.restore()
 
     x = cursor_x - 16
@@ -846,11 +846,32 @@ export function arr_shuffle<A>(array: Array<A>) {
     return array
 }
 
+class ThanksHorse {
+
+    x = 0
+    y = 0
+
+    get anim_frame() {
+        return Math.floor(this.frame % 3)
+    }
+    frame = 0
+
+    update(dt: number) {
+        this.frame += 0.007 * dt
+
+
+    }
+}
+let thanks_horse = new ThanksHorse()
+
 
 function render_thanks_time() {
-
+    let x = 120
+    let y = 120
+    draw_spr(0 + thanks_horse.anim_frame * 48, 80, 48, 32, x, y, 6, 6)
 }
 
-function update_thanks_time(_dt: number) {
+function update_thanks_time(dt: number) {
+    thanks_horse.update(dt)
 
 }
