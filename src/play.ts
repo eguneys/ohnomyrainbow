@@ -1,7 +1,7 @@
 import { AudioPlayer } from "./audioplayer"
 import { box_intersects, type Box } from "./collision"
 import { Mouse } from "./mouse"
-import { song_hello } from "./songs"
+import { song_hello, main_song, broom_song } from "./songs"
 
 
 let enable_interaction = true
@@ -289,7 +289,7 @@ class Broom {
 let thanks_time = false
 let thanks_cool = 600
 
-let broom_time = true
+let broom_time = false
 let broom = new Broom()
 let poo_pickups = [
     new PooPickup(30, 50),
@@ -453,19 +453,24 @@ export function _update(dt: number) {
             if (thanks_cool < 0) {
                 update_thanks_time(dt)
             }
-        }
-
-        if (broom_time) {
+        } else if (broom_time) {
             let all_clean = poo_pickups.every(_ => _.picked_up)
             if (all_clean) {
                 thanks_time = true
                 broom_time = false
             }
+        } else {
+            let all_eaten = apples.every(_ => !_.visible)
+            if (all_eaten) {
+                broom_time = true
+                audio.stopAudio('main')
+                audio.playAudio('broom', true)
+            }
         }
 
         if (mouse.is_just_down) {
             if (button.hovering) {
-                has_sorted_true = true
+                //has_sorted_true = true
                 if (has_sorted_true) {
                     button.click()
                     level.level_up()
@@ -693,9 +698,9 @@ export function _render() {
     if (import.meta.env.DEV) {
         //render_box(cursor_box_large())
         //render_box(button.box())
-        for (let poo of poo_pickups) {
-            //render_box(poo.box)
-        }
+        //for (let poo of poo_pickups) {
+        //render_box(poo.box)
+        //}
     }
 }
 
@@ -752,10 +757,11 @@ class AudioPlayerManager {
     static loadAudio = async () => {
         let res = new AudioPlayerManager()
 
-        res.audio.set('main', await AudioPlayer.init(song_hello))
+        res.audio.set('broom', await AudioPlayer.init(broom_song, 110))
+        res.audio.set('main', await AudioPlayer.init(main_song, 110))
         res.audio.set('jump', await AudioPlayer.init(song_hello.slice(23, 35), 333))
-        res.audio.set('end_drag', await AudioPlayer.init(song_hello.slice(6, 9), 133))
-        res.audio.set('begin_drag', await AudioPlayer.init(song_hello.slice(17, 20), 133))
+        res.audio.set('end_drag', await AudioPlayer.init(song_hello.slice(6, 7), 330))
+        res.audio.set('begin_drag', await AudioPlayer.init(song_hello.slice(17, 18), 330))
         res.audio.set('slide', await AudioPlayer.init(song_hello.slice(37, 40), 320))
 
         res.audio.set('flash', await AudioPlayer.init(song_hello.slice(8, 13).repeat(2).concat(song_hello.slice(5, 8).repeat(3)).concat(song_hello.slice(0, 5).repeat(2)), 301))
@@ -766,6 +772,10 @@ class AudioPlayerManager {
     audio: Map<string, AudioPlayer> = new Map()
 
     looping: Map<string, AudioPlayback> = new Map()
+
+    stopAudio(name: string) {
+        this.looping.get(name)?.stop()
+    }
 
     playAudio(name: string, loop: boolean = false) {
         let pl = this.audio.get(name)!.play(loop)
@@ -841,6 +851,6 @@ function render_thanks_time() {
 
 }
 
-function update_thanks_time(dt: number) {
+function update_thanks_time(_dt: number) {
 
 }
