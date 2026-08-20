@@ -763,6 +763,7 @@ function draw_spr(sx: number, sy: number, sw: number, sh: number, x: number, y: 
     //cx.drawImage(spr_png, sx, sy, sw, sh, x, y, Math.floor(sw * scale_x), Math.floor(sh * scale_y))
 }
 
+import sprites_png from './assets/sprites.png'
 let spr_png!: HTMLImageElement
 export async function _load() {
 
@@ -770,7 +771,7 @@ export async function _load() {
     audio = await AudioPlayerManager.loadAudio()
 
     spr_png = new Image()
-    spr_png.src = './sprites.png'
+    spr_png.src = sprites_png
     return Promise.all([
         new Promise(resolve => spr_png.onload = resolve),
     ])
