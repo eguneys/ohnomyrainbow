@@ -6,7 +6,10 @@ export class Mouse {
     }
 
     private constructor(canvas: HTMLCanvasElement) {
-        canvas.addEventListener('pointerdown', (e: PointerEvent) => this.on_down(e.clientX, e.clientY))
+        canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+            canvas.setPointerCapture(e.pointerId)
+            this.on_down(e.clientX, e.clientY)
+        })
         canvas.addEventListener('pointermove', (e: PointerEvent) => this.on_move(e.clientX, e.clientY))
         document.addEventListener('pointerup', (e: PointerEvent) => this.on_up(e.clientX, e.clientY))
     }
@@ -22,6 +25,7 @@ export class Mouse {
 
     private on_down = (x: number, y: number) => {
         this.is_just_down = this.normalize(x, y)
+        this.is_hovering = this.normalize(x, y)
     }
 
     private on_move = (x: number, y: number) => {
@@ -31,6 +35,7 @@ export class Mouse {
 
     private on_up = (x: number, y: number) => {
         this.is_just_up = this.normalize(x, y)
+        this.is_hovering = this.normalize(x, y)
     }
 
     update() {
