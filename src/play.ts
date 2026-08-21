@@ -959,7 +959,7 @@ class ThanksFadeOut {
             this.fade_out_timer = Math.max(0, this.fade_out_timer - dt)
 
             if (this.fade_out_timer === 0) {
-                this.black_timer = 1300
+                this.black_timer = 2123
             }
         }
 
