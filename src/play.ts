@@ -763,7 +763,7 @@ function draw_spr(sx: number, sy: number, sw: number, sh: number, x: number, y: 
     //cx.drawImage(spr_png, sx, sy, sw, sh, x, y, Math.floor(sw * scale_x), Math.floor(sh * scale_y))
 }
 
-import sprites_png from './assets/sprites.png'
+//import sprites_png from './assets/sprites.png'
 let spr_png!: HTMLImageElement
 export async function _load() {
 
@@ -771,7 +771,7 @@ export async function _load() {
     audio = await AudioPlayerManager.loadAudio()
 
     spr_png = new Image()
-    spr_png.src = sprites_png
+    spr_png.src = './sprites.png'
     return Promise.all([
         new Promise(resolve => spr_png.onload = resolve),
     ])
@@ -959,7 +959,7 @@ class ThanksFadeOut {
             this.fade_out_timer = Math.max(0, this.fade_out_timer - dt)
 
             if (this.fade_out_timer === 0) {
-                this.black_timer = 2123
+                this.black_timer = 4723
             }
         }
 
